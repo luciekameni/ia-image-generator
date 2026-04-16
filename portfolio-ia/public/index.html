@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IA Image Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3a;
+    --accent: #7c6dfa;
+    --accent2: #fa6d8f;
+    --accent3: #6dfacc;
+    --text: #f0eeff;
+    --muted: #7a7a9a;
+    --mono: 'DM Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--mono); min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px; opacity: 0.3; pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: ''; position: fixed; top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(124,109,250,0.12) 0%, transparent 70%);
+    pointer-events: none; z-index: 0; animation: orb 8s ease-in-out infinite alternate;
+  }
+  @keyframes orb { to { transform: translate(60vw, 60vh); } }
+  .app { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 24px 60px; }
+  header { padding: 40px 0 32px; display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
+  .logo { font-family: var(--display); font-size: 13px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .logo span { color: var(--accent); }
+  .header-tag { font-size: 11px; color: var(--accent3); letter-spacing: 0.1em; display: flex; align-items: center; gap: 6px; }
+  .header-tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent3); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+  .hero-title { font-family: var(--display); font-size: clamp(38px, 7vw, 72px); font-weight: 800; line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 16px; }
+  .hero-title .line2 { display: block; color: transparent; -webkit-text-stroke: 1px var(--accent); }
+  .hero-subtitle { font-size: 13px; color: var(--muted); line-height: 1.7; max-width: 400px; margin-bottom: 48px; }
+  .input-zone { background: var(--surface); border: 1px solid var(--border); border-radius: 2px; padding: 20px 24px; margin-bottom: 16px; transition: border-color 0.2s; }
+  .input-zone:focus-within { border-color: var(--accent); }
+  .input-label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; display: block; }
+  textarea { width: 100%; background: transparent; border: none; outline: none; color: var(--text); font-family: var(--mono); font-size: 14px; line-height: 1.6; resize: none; min-height: 80px; }
+  textarea::placeholder { color: var(--muted); }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .preset-btn { font-family: var(--mono); font-size: 11px; padding: 6px 14px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; border-radius: 1px; transition: all 0.15s; letter-spacing: 0.05em; }
+  .preset-btn:hover, .preset-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(124,109,250,0.08); }
+  .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .generate-btn { font-family: var(--display); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 14px 32px; background: var(--accent); color: #fff; border: none; cursor: pointer; border-radius: 1px; transition: all 0.2s; position: relative; overflow: hidden; }
+  .generate-btn::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); transform: translateX(-100%); transition: transform 0.4s; }
+  .generate-btn:hover::before { transform: translateX(100%); }
+  .generate-btn:hover { background: #9d8ffb; }
+  .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ratio-select { font-family: var(--mono); font-size: 11px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text); cursor: pointer; border-radius: 1px; outline: none; letter-spacing: 0.05em; }
+  .output-area { margin-top: 40px; }
+  .output-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+  @media (max-width: 600px) { .output-grid { grid-template-columns: 1fr; } }
+  .image-card { background: var(--surface); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity 0.4s, transform 0.4s, border-color 0.2s; }
+  .image-card.visible { opacity: 1; transform: translateY(0); }
+  .image-card:hover { border-color: var(--accent); }
+  .canvas-wrap { position: relative; aspect-ratio: 1; background: var(--surface2); overflow: hidden; }
+  .canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+  .card-meta { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
+  .card-style { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); }
+  .download-btn { font-size: 11px; font-family: var(--mono); color: var(--muted); background: transparent; border: 1px solid var(--border); padding: 5px 12px; cursor: pointer; border-radius: 1px; transition: all 0.15s; }
+  .download-btn:hover { color: var(--text); border-color: var(--muted); }
+  .loading-bar { height: 2px; background: var(--border); overflow: hidden; margin-bottom: 24px; display: none; }
+  .loading-bar.active { display: block; }
+  .loading-bar::after { content: ''; display: block; height: 100%; width: 40%; background: linear-gradient(90deg, var(--accent), var(--accent2)); animation: loading 1.2s ease-in-out infinite; }
+  @keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+  .status-line { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; min-height: 18px; }
+  .status-line.error { color: var(--accent2); }
+  .history-section { margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--border); }
+  .section-label { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
+  .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .history-thumb { aspect-ratio: 1; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; cursor: pointer; transition: border-color 0.15s, transform 0.15s; border-radius: 2px; }
+  .history-thumb:hover { border-color: var(--accent); transform: scale(1.02); }
+  .history-thumb canvas { width: 100%; height: 100%; display: block; }
+  .char-count { font-size: 10px; color: var(--muted); text-align: right; margin-top: 6px; }
+  .footer-note { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .footer-note a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo"><span>//</span> Marie Dupont — Portfolio</div>
+    <div class="header-tag">IA · Génération d'images</div>
+  </header>
+
+  <div class="hero-title">IMAGE<br><span class="line2">GENERATOR</span></div>
+  <p class="hero-subtitle">Décris une scène, une ambiance, une idée — l'IA génère une interprétation visuelle unique en quelques secondes.</p>
+
+  <div class="presets" id="presets">
+    <button class="preset-btn active" onclick="selectPreset(this,'abstract')">Abstrait</button>
+    <button class="preset-btn" onclick="selectPreset(this,'landscape')">Paysage</button>
+    <button class="preset-btn" onclick="selectPreset(this,'portrait')">Portrait</button>
+    <button class="preset-btn" onclick="selectPreset(this,'architecture')">Architecture</button>
+    <button class="preset-btn" onclick="selectPreset(this,'glitch')">Glitch</button>
+    <button class="preset-btn" onclick="selectPreset(this,'minimal')">Minimal</button>
+  </div>
+
+  <div class="input-zone">
+    <span class="input-label">// Prompt</span>
+    <textarea id="prompt" placeholder="Ex: une forêt de cristal violet sous une lune brisée, ambiance onirique..." maxlength="400" oninput="updateCount()"></textarea>
+  </div>
+  <div class="char-count"><span id="char-count">0</span> / 400</div>
+
+  <div class="controls" style="margin-top:16px">
+    <button class="generate-btn" id="gen-btn" onclick="generate()">Générer</button>
+    <select class="ratio-select" id="count-select">
+      <option value="1">× 1 image</option>
+      <option value="2" selected>× 2 images</option>
+      <option value="4">× 4 images</option>
+    </select>
+  </div>
+
+  <div class="output-area">
+    <div class="loading-bar" id="loading-bar"></div>
+    <div class="status-line" id="status"></div>
+    <div class="output-grid" id="output-grid"></div>
+  </div>
+
+  <div class="history-section" id="history-section" style="display:none">
+    <div class="section-label">// Générations précédentes</div>
+    <div class="history-grid" id="history-grid"></div>
+  </div>
+
+  <div class="footer-note">
+    <span>Projet portfolio — Marie Dupont · 2024</span>
+    <span>Propulsé par <a href="https://anthropic.com">Claude API</a> · Rendu canvas natif</span>
+  </div>
+</div>
+
+<script>
+let currentStyle = 'abstract';
+
+function selectPreset(btn, style) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentStyle = style;
+}
+
+function updateCount() {
+  document.getElementById('char-count').textContent = document.getElementById('prompt').value.length;
+}
+
+function setStatus(msg, isError = false) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status-line' + (isError ? ' error' : '');
+}
+
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) { setStatus('// Entrez un prompt pour générer', true); return; }
+
+  const count = parseInt(document.getElementById('count-select').value);
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  document.getElementById('loading-bar').classList.add('active');
+  document.getElementById('output-grid').innerHTML = '';
+  setStatus('// Génération en cours...');
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, style: currentStyle, count }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Erreur serveur');
+    }
+
+    const parsed = await res.json();
+    renderImages(parsed.images, prompt);
+    setStatus(`// ${parsed.images.length} image(s) générée(s) avec succès`);
+
+  } catch(err) {
+    setStatus('// Erreur : ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    document.getElementById('loading-bar').classList.remove('active');
+  }
+}
+
+function renderImages(images, prompt) {
+  const grid = document.getElementById('output-grid');
+  images.forEach((img, i) => {
+    const card = document.createElement('div');
+    card.className = 'image-card';
+    const wrap = document.createElement('div');
+    wrap.className = 'canvas-wrap';
+    const canvas = document.createElement('canvas');
+    canvas.width = 800; canvas.height = 800;
+    drawImage(canvas, img);
+    wrap.appendChild(canvas);
+    const meta = document.createElement('div');
+    meta.className = 'card-meta';
+    const safeName = prompt.slice(0, 20).replace(/[^a-zA-Z0-9]/g, '-');
+    meta.innerHTML = `
+      <span class="card-style">${img.style || currentStyle}</span>
+      <button class="download-btn" onclick="downloadCanvas(this.closest('.image-card').querySelector('canvas'),'${safeName}')">↓ Sauvegarder</button>`;
+    card.appendChild(wrap);
+    card.appendChild(meta);
+    grid.appendChild(card);
+    setTimeout(() => card.classList.add('visible'), i * 120);
+    addToHistory(canvas, img.style || currentStyle);
+  });
+}
+
+function drawImage(canvas, img) {
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = img.background || '#111';
+  ctx.fillRect(0, 0, 800, 800);
+  (img.elements || []).forEach(el => {
+    ctx.save();
+    ctx.globalAlpha = el.alpha || 1;
+    if (el.fill !== false) ctx.fillStyle = el.color || '#fff';
+    if (el.stroke) { ctx.strokeStyle = el.stroke; ctx.lineWidth = el.strokeWidth || 1; }
+    switch(el.type) {
+      case 'circle':
+        ctx.beginPath(); ctx.arc(el.x, el.y, el.r || 40, 0, Math.PI*2);
+        if (el.fill !== false) ctx.fill(); if (el.stroke) ctx.stroke(); break;
+      case 'rect':
+        if (el.fill !== false) ctx.fillRect(el.x, el.y, el.w||100, el.h||100);
+        if (el.stroke) ctx.strokeRect(el.x, el.y, el.w||100, el.h||100); break;
+      case 'polygon':
+        if (el.points?.length > 1) {
+          ctx.beginPath(); ctx.moveTo(el.points[0][0], el.points[0][1]);
+          el.points.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+          ctx.closePath(); if (el.fill !== false) ctx.fill(); if (el.stroke) ctx.stroke();
+        } break;
+      case 'line':
+        ctx.beginPath(); ctx.moveTo(el.x1??el.x, el.y1??el.y); ctx.lineTo(el.x2??el.x+100, el.y2??el.y);
+        ctx.strokeStyle = el.color||'#fff'; ctx.lineWidth = el.strokeWidth||1; ctx.stroke(); break;
+      case 'arc':
+        ctx.beginPath(); ctx.arc(el.x, el.y, el.r||40, (el.startAngle||0)*Math.PI/180, (el.endAngle||180)*Math.PI/180);
+        ctx.strokeStyle = el.color||'#fff'; ctx.lineWidth = el.strokeWidth||2; ctx.stroke(); break;
+      case 'bezier':
+        ctx.beginPath(); ctx.moveTo(el.x1??el.x, el.y1??el.y);
+        ctx.bezierCurveTo(el.cp1x||el.x, el.cp1y||el.y, el.cp2x||el.x+100, el.cp2y||el.y, el.x2||el.x+200, el.y2||el.y);
+        ctx.strokeStyle = el.color||'#fff'; ctx.lineWidth = el.strokeWidth||2; ctx.stroke(); break;
+    }
+    ctx.restore();
+  });
+}
+
+function addToHistory(sourceCanvas, style) {
+  const section = document.getElementById('history-section');
+  const grid = document.getElementById('history-grid');
+  section.style.display = 'block';
+  const thumb = document.createElement('div');
+  thumb.className = 'history-thumb';
+  const c = document.createElement('canvas');
+  c.width = 200; c.height = 200;
+  c.getContext('2d').drawImage(sourceCanvas, 0, 0, 200, 200);
+  thumb.appendChild(c); thumb.title = style;
+  grid.insertBefore(thumb, grid.firstChild);
+  if (grid.children.length > 12) grid.removeChild(grid.lastChild);
+}
+
+function downloadCanvas(canvas, name) {
+  const a = document.createElement('a');
+  a.download = `generation-${name}-${Date.now()}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+window.addEventListener('load', () => {
+  document.getElementById('prompt').value = 'une ville futuriste sous la pluie, néons reflétés sur l\'asphalte';
+  updateCount();
+});
+</script>
+</body>
+</html>

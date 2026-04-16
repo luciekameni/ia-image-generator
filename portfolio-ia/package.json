@@ -1,0 +1,6 @@
+{
+  "name": "ia-image-generator",
+  "version": "1.0.0",
+  "description": "Générateur d'images IA — Projet portfolio",
+  "engines": { "node": ">=18" }
+}
